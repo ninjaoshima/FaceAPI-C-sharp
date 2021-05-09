@@ -84,7 +84,7 @@ namespace FaceAPI.Controllers
             return new JsonResult( await azura.getIdentifyFace(src.index));
         }
 
-        [HttpGet]
+        [HttpPost]
         [Route("getface")]
         public async Task<ActionResult> GetFace([FromBody] RequestBody request)
         {
@@ -95,8 +95,8 @@ namespace FaceAPI.Controllers
         [Route("getallowkey")]
         public ActionResult GetAllowKey()
         {
-            //return new JsonResult(new { status = azura.GetAllowKey() });
-            return new JsonResult(new { status = "0" });
+            return new JsonResult(new { status = azura.GetAllowKey() });
+            //return new JsonResult(new { status = "0" });
         }
     }
 

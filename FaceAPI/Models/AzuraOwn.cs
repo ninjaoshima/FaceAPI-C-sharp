@@ -212,50 +212,71 @@ namespace FaceAPI.Models
                 {
                     var faces = await faceClient.Face.DetectWithStreamAsync(s);
                     IList<Guid> faceIds = faces.Select<DetectedFace, Guid>(face => (Guid)face.FaceId).ToArray();//.Select(face => face.FaceId).ToList();
-
-                    var results = await faceClient.Face.IdentifyAsync(faceIds, personalGroupId);
+                    int result_index = faceIds.Count / 10 + 1;
+                    List<IList<Guid>> faceIdContainer = new List<IList<Guid>>(result_index);
+                    int c_index = 0, r_index = 0;
+                    foreach(Guid guid in faceIds)
+                    {
+                        c_index++;
+                        if(c_index / 10 >= r_index)
+                        {
+                            r_index++;
+                            faceIdContainer.Add(new List<Guid>());
+                        }
+                        faceIdContainer[c_index / 10].Add(guid);    
+                    }
+                    List<IList<IdentifyResult>> results1 = new List<IList<IdentifyResult>>();
+                    foreach(IList<Guid> guids in faceIdContainer)
+                    {
+                        results1.Add(await faceClient.Face.IdentifyAsync(guids, personalGroupId));
+                    }
+                    
                     List<string> personName = new List<string>();
                     PersonalModel persons = _services.GetPersonal();
                     List<string> history = new List<string>();
-                    foreach (var identifyResult in results)
+                    foreach(IList<IdentifyResult> identifies in results1)
                     {
-                        Console.WriteLine("Result of face: {0}", identifyResult.FaceId);
-                        if (identifyResult.Candidates.Count == 0)
+                        foreach (var identifyResult in identifies)
                         {
-                            personName.Add("No one identified");
-                        }
-                        else
-                        {
-                            // Get top 1 among all candidates returned
-                            var candidateId = identifyResult.Candidates[0].PersonId;
-                            foreach(var person in persons.persons)
+                            Console.WriteLine("Result of face: {0}", identifyResult.FaceId);
+                            if (identifyResult.Candidates.Count == 0)
                             {
-                                if(person.PersonId == identifyResult.Candidates[0].PersonId)
-                                {
-                                    personName.Add(person.Name);
-                                    CultureInfo provider = CultureInfo.InvariantCulture;
-                                    //string dt1 = DateTime.Now.ToString("yyyyMMdd_HHmmss_FFF");
-                                    DateTime dt = DateTime.ParseExact(time_str, "yyyyMMdd_HHmmss_FFF", provider); //.Parse(time_str.Split('_')[0]);
-                                    string his = dt.ToString("yyyy/MM/dd HH:mm:ss ") + person.Name + " appeared";
-                                    history.Add(his);
-                                    if (!File.Exists(logfile))
-                                    {
-                                        File.WriteAllText(logfile, his);
-                                    }
-                                    else
-                                    {
-                                        his = $"{Environment.NewLine}{his}";
-                                        File.AppendAllText(logfile, his);
-                                    }
-                                    break;
-                                }
+                                personName.Add("No one identified");
                             }
-                            //var person = new { Name = ""};// await faceClient.PersonGroupPerson.GetAsync(personalGroupId, candidateId);
-                            //Console.WriteLine("Identified as {0}", person.Name);
-                            //return "Idnetified as " + person.Name;
-                            
+                            else
+                            {
+                                // Get top 1 among all candidates returned
+                                var candidateId = identifyResult.Candidates[0].PersonId;
+                                foreach (var person in persons.persons)
+                                {
+                                    if (person.PersonId == identifyResult.Candidates[0].PersonId)
+                                    {
+                                        personName.Add(person.Name);
+                                        CultureInfo provider = CultureInfo.InvariantCulture;
+                                        //string dt1 = DateTime.Now.ToString("yyyyMMdd_HHmmss_FFF");
+                                        DateTime dt = DateTime.ParseExact(time_str, "yyyyMMdd_HHmmss_FFF", provider); //.Parse(time_str.Split('_')[0]);
+                                        string his = dt.ToString("yyyy/MM/dd HH:mm:ss ") + person.Name + " appeared";
+                                        history.Add(his);
+                                        if (!File.Exists(logfile))
+                                        {
+                                            File.WriteAllText(logfile, his);
+                                        }
+                                        else
+                                        {
+                                            his = $"{Environment.NewLine}{his}";
+                                            File.AppendAllText(logfile, his);
+                                        }
+                                        break;
+                                    }
+                                }
+                                //var person = new { Name = ""};// await faceClient.PersonGroupPerson.GetAsync(personalGroupId, candidateId);
+                                //Console.WriteLine("Identified as {0}", person.Name);
+                                //return "Idnetified as " + person.Name;
+
+                            }
                         }
                     }
+                    
 
                     Image image = Image.FromFile(testImageFile);
                     using (Graphics g = Graphics.FromImage(image))
@@ -291,6 +312,7 @@ namespace FaceAPI.Models
             }
             catch (Exception e)
             {
+                Console.WriteLine(e.Message);
                 ImageIndexModel indexM = new ImageIndexModel();
                 indexM.index = index;
                 indexM.src = "Failed";
